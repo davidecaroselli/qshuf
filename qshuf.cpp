@@ -34,28 +34,28 @@ std::vector<mmap_buffer> collect_lines_multithreaded(const mmap_buffer &data, in
     std::vector<std::thread> threads;
     std::vector<std::vector<mmap_buffer>> outputs(num_threads);
 
-    size_t chunk_size = data.length / num_threads;
+    const char *eof = data.start + data.length;
 
+    const char *chunk_start = data.start;
     for (int i = 0; i < num_threads; ++i) {
-        const char *start = data.start + i * chunk_size;
-        const char *end = (i == num_threads - 1) ? data.start + data.length : start + chunk_size;
+        const char *chunk_end;
 
-        // Adjust chunk boundaries to avoid splitting lines
-        if (i != 0) {
-            while (start >= data.start && *start != '\n') {
-                --start; // Move to the previous newline
+        if (i == num_threads - 1) {
+            chunk_end = eof;
+        } else {
+            chunk_end = data.start + (i + 1) * (data.length / num_threads);
+
+            // Adjust end to be after the next newline (including it)
+            while (chunk_end < eof && *chunk_end != '\n') {
+                ++chunk_end;
             }
-
-            start++; // Move to the next character after the newline
-        }
-
-        if (i != num_threads - 1) {
-            while (end < data.start + data.length && *end != '\n') {
-                ++end; // Move to the next newline
+            if (chunk_end < eof) {
+                ++chunk_end;
             }
         }
 
-        threads.emplace_back(collect_lines, start, end, &outputs[i]);
+        threads.emplace_back(collect_lines, chunk_start, chunk_end, &outputs[i]);
+        chunk_start = chunk_end;
     }
 
     for (auto &t: threads) {
