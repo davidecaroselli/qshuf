@@ -111,8 +111,11 @@ mmap_buffer mmap_file(const int fd) {
 }
 
 int main(int argc, char *argv[]) {
+    std::random_device rd;
+
     // Parse args
     int num_threads = 1;
+    unsigned int seed = rd();
     char *input_file = nullptr;
 
     int i = 1;
@@ -129,6 +132,9 @@ int main(int argc, char *argv[]) {
             std::cout << std::endl;
             std::cout << "Written by Davide Caroselli." << std::endl;
             return CLI_SUCCESS;
+        } else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--seed") == 0) {
+            seed = std::stoi(argv[i + 1]);
+            i += 2;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             std::cout << "Usage: qshuf [OPTIONS] <input_file>" << std::endl;
             std::cout << "Efficiently shuffles very large text files using" << std::endl;
@@ -136,6 +142,7 @@ int main(int argc, char *argv[]) {
             std::cout << std::endl;
             std::cout << "Options:" << std::endl;
             std::cout << "  -t, --threads <num>  number of threads to use (default: 1)" << std::endl;
+            std::cout << "  -s, --seed <seed>    Set random seed for reproducibility" << std::endl;
             std::cout << "  -v, --version        output version information and exit" << std::endl;
             std::cout << "  -h, --help           display this help message" << std::endl;
             return CLI_SUCCESS;
@@ -169,8 +176,7 @@ int main(int argc, char *argv[]) {
     std::vector<mmap_buffer> lines = collect_lines_multithreaded(data, num_threads);
 
     // Shuffle lines
-    std::random_device rd;
-    std::mt19937 rng(rd());
+    std::mt19937 rng(seed);
     std::shuffle(lines.begin(), lines.end(), rng);
 
     // Print lines
