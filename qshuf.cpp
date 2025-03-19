@@ -8,9 +8,11 @@
 #include <thread>
 #include <cstring>
 #include <algorithm>
+#include <cerrno>
 #include <random>
 
 #define CLI_SUCCESS 0
+#define CLI_ERROR 1
 #define CLI_INVALID_OPTION 2
 
 #define QSHUF_VERSION "0.0.1"
@@ -81,16 +83,6 @@ std::vector<mmap_buffer> collect_lines_multithreaded(const mmap_buffer &data, in
     return all_lines;
 }
 
-int open_file(const std::string &file_path) {
-    const int fd = open(file_path.c_str(), O_RDONLY);
-    if (fd == -1) {
-        perror("Error opening file");
-        exit(1);
-    }
-
-    return fd;
-}
-
 mmap_buffer mmap_file(const int fd) {
     struct stat st{};
     if (fstat(fd, &st) == -1) {
@@ -117,6 +109,7 @@ int main(int argc, char *argv[]) {
     int num_threads = 1;
     unsigned int seed = rd();
     char *input_file = nullptr;
+    char *output_file = nullptr;
 
     int i = 1;
     while (i < argc) {
@@ -135,6 +128,9 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--seed") == 0) {
             seed = std::stoi(argv[i + 1]);
             i += 2;
+        } else if (strcmp(argv[i], "-o") == 0) {
+            output_file = argv[i + 1];
+            i += 2;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             std::cout << "Usage: qshuf [OPTIONS] <input_file>" << std::endl;
             std::cout << "Efficiently shuffles very large text files using" << std::endl;
@@ -142,7 +138,8 @@ int main(int argc, char *argv[]) {
             std::cout << std::endl;
             std::cout << "Options:" << std::endl;
             std::cout << "  -t, --threads <num>  number of threads to use (default: 1)" << std::endl;
-            std::cout << "  -s, --seed <seed>    Set random seed for reproducibility" << std::endl;
+            std::cout << "  -o <output_file>     write output to a file instead of stdout" << std::endl;
+            std::cout << "  -s, --seed <seed>    set random seed for reproducibility" << std::endl;
             std::cout << "  -v, --version        output version information and exit" << std::endl;
             std::cout << "  -h, --help           display this help message" << std::endl;
             return CLI_SUCCESS;
@@ -168,9 +165,43 @@ int main(int argc, char *argv[]) {
         return CLI_INVALID_OPTION;
     }
 
-    // Open and memory map file
-    const int fd = open_file(input_file);
-    mmap_buffer data = mmap_file(fd);
+    std::ostream* out = &std::cout;
+
+    std::ofstream output_stream;
+    if (output_file) {
+        output_stream.open(output_file);
+        if (!output_stream.is_open()) {
+            std::cerr << "qshuf: cannot open '" << output_file << "': " << strerror(errno) << std::endl;
+            return CLI_ERROR;
+        }
+
+        out = &output_stream;
+    }
+
+    // Open file
+    const int fd = open(input_file, O_RDONLY);
+    if (fd == -1) {
+        std::cerr << "qshuf: cannot access '" << input_file << "': " << strerror(errno) << std::endl;
+        return CLI_INVALID_OPTION;
+    }
+
+    // Memory map file
+    struct stat st{};
+    if (fstat(fd, &st) == -1) {
+        std::cerr << "qshuf: cannot stat '" << input_file << "': " << strerror(errno) << std::endl;
+        close(fd);
+        return CLI_INVALID_OPTION;
+    }
+
+    const size_t st_size = st.st_size;
+    auto mmap_data = static_cast<char *>(mmap(nullptr, st_size, PROT_READ, MAP_PRIVATE, fd, 0));
+    if (mmap_data == MAP_FAILED) {
+        std::cerr << "qshuf: cannot memory map file '" << input_file << "': " << strerror(errno) << std::endl;
+        close(fd);
+        return CLI_ERROR;
+    }
+
+    mmap_buffer data = {mmap_data, st_size};
 
     // Collect lines
     std::vector<mmap_buffer> lines = collect_lines_multithreaded(data, num_threads);
@@ -181,9 +212,12 @@ int main(int argc, char *argv[]) {
 
     // Print lines
     for (const auto &line: lines) {
-        std::cout.write(line.start, static_cast<std::streamsize>(line.length));
-        std::cout << '\n';
+        out->write(line.start, static_cast<std::streamsize>(line.length));
+        out->write("\n", 1);
     }
+
+    if (output_file)
+        output_stream.close();
 
     // Cleanup
     munmap(data.start, data.length);
