@@ -13,6 +13,8 @@
 #define CLI_SUCCESS 0
 #define CLI_INVALID_OPTION 2
 
+#define QSHUF_VERSION "0.0.1"
+
 struct mmap_buffer {
     char *start;
     size_t length;
@@ -118,14 +120,24 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--threads") == 0) {
             num_threads = std::stoi(argv[i + 1]);
             i += 2;
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
+            std::cout << "qshuf " << QSHUF_VERSION << std::endl;
+            std::cout << "Copyright (c) 2025 Davide Caroselli" << std::endl;
+            std::cout << "License MIT: <https://opensource.org/license/MIT>" << std::endl;
+            std::cout << "This is free software: you are free to change and redistribute it." << std::endl;
+            std::cout << "There is NO WARRANTY, to the extent permitted by law." << std::endl;
+            std::cout << std::endl;
+            std::cout << "Written by Davide Caroselli." << std::endl;
+            return CLI_SUCCESS;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             std::cout << "Usage: qshuf [OPTIONS] <input_file>" << std::endl;
             std::cout << "Efficiently shuffles very large text files using" << std::endl;
             std::cout << "memory mapping, minimizing RAM usage." << std::endl;
             std::cout << std::endl;
             std::cout << "Options:" << std::endl;
-            std::cout << "  -t, --threads <num>  Number of threads to use (default: 1)" << std::endl;
-            std::cout << "  -h, --help           Display this help message" << std::endl;
+            std::cout << "  -t, --threads <num>  number of threads to use (default: 1)" << std::endl;
+            std::cout << "  -v, --version        output version information and exit" << std::endl;
+            std::cout << "  -h, --help           display this help message" << std::endl;
             return CLI_SUCCESS;
         } else if (argv[i][0] == '-') {
             std::cerr << "qshuf: invalid option -- '" << argv[i] << "'" << std::endl;
