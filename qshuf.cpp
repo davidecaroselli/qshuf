@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <random>
 
+#define CLI_SUCCESS 0
+#define CLI_INVALID_OPTION 2
+
 struct mmap_buffer {
     char *start;
     size_t length;
@@ -116,20 +119,34 @@ int main(int argc, char *argv[]) {
             num_threads = std::stoi(argv[i + 1]);
             i += 2;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            std::cout << "Usage: " << argv[0] << " [options] <input_file>" << std::endl;
+            std::cout << "Usage: qshuf [OPTIONS] <input_file>" << std::endl;
+            std::cout << "Efficiently shuffles very large text files using" << std::endl;
+            std::cout << "memory mapping, minimizing RAM usage." << std::endl;
+            std::cout << std::endl;
             std::cout << "Options:" << std::endl;
             std::cout << "  -t, --threads <num>  Number of threads to use (default: 1)" << std::endl;
             std::cout << "  -h, --help           Display this help message" << std::endl;
-            return 0;
+            return CLI_SUCCESS;
+        } else if (argv[i][0] == '-') {
+            std::cerr << "qshuf: invalid option -- '" << argv[i] << "'" << std::endl;
+            std::cerr << "Try 'qshuf --help' for more information." << std::endl;
+            return CLI_INVALID_OPTION;
         } else {
             if (input_file != nullptr) {
-                std::cerr << "Error: multiple input files specified" << std::endl;
-                return 1;
+                std::cerr << "qshuf: extra operand '" << argv[i] << "'" << std::endl;
+                std::cerr << "Try 'qshuf --help' for more information." << std::endl;
+                return CLI_INVALID_OPTION;
             }
 
             input_file = argv[i];
             i++;
         }
+    }
+
+    if (input_file == nullptr) {
+        std::cerr << "qshuf: missing operand" << std::endl;
+        std::cerr << "Try 'qshuf --help' for more information." << std::endl;
+        return CLI_INVALID_OPTION;
     }
 
     // Open and memory map file
